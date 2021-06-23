@@ -4,7 +4,7 @@ import { Image } from 'react-native';
 import { styles } from './styles';
 
 type Props = {
-  iconUrl?: string;
+  iconUrl: string | null;
 };
 
 export function GuildIcon({ iconUrl }: Props) {

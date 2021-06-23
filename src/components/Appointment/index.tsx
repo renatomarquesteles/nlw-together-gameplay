@@ -13,7 +13,7 @@ export type GuildProps = {
   id: string;
   name: string;
   owner: boolean;
-  icon?: string;
+  icon: string | null;
 };
 
 export type AppointmentProps = {
