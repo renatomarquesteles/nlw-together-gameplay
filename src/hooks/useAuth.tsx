@@ -1,14 +1,21 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import React, {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import * as AuthSession from 'expo-auth-session';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import {
-  REDIRECT_URI,
-  SCOPE,
-  RESPONSE_TYPE,
-  CLIENT_ID,
-  CDN_IMAGE,
-} from '../configs';
 import { api } from '../services/api';
+import { COLLECTION_USER } from '../configs/database';
+
+const { REDIRECT_URI } = process.env;
+const { SCOPE } = process.env;
+const { RESPONSE_TYPE } = process.env;
+const { CLIENT_ID } = process.env;
+const { CDN_IMAGE } = process.env;
 
 type User = {
   id: string;
@@ -23,6 +30,7 @@ type AuthContextData = {
   user: User;
   isLoading: boolean;
   signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 type AuthProviderProps = {
@@ -31,7 +39,8 @@ type AuthProviderProps = {
 
 type AuthorizationResponse = AuthSession.AuthSessionResult & {
   params: {
-    access_token: string;
+    access_token?: string;
+    error?: string;
   };
 };
 
@@ -47,26 +56,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const authUrl = `${api.defaults.baseURL}/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=${RESPONSE_TYPE}&scope=${SCOPE}`;
 
-      /**
-        Object {
-          "authentication": null,
-          "errorCode": null,
-          "params": Object {
-            "access_token": "XkXTN8HLqO1W70N9oLPXI0u8722zg2",
-            "exp://w8-8gp.anonymous.gameplay.exp.direct:80/--/expo-auth-session": "",
-            "expires_in": "604800",
-            "scope": "identify email connections guilds",
-            "token_type": "Bearer",
-          },
-          "type": "success",
-          "url": "exp://w8-8gp.anonymous.gameplay.exp.direct:80/--/expo-auth-session#token_type=Bearer&access_token=XkXTN8HLqO1W70N9oLPXI0u8722zg2&expires_in=604800&scope=identify+email+connections+guilds",
-        }
-       */
       const { type, params } = (await AuthSession.startAsync({
         authUrl,
       })) as AuthorizationResponse;
 
-      if (type === 'success') {
+      if (type === 'success' && !params.error) {
         api.defaults.headers.authorization = `Bearer ${params.access_token}`;
 
         const userInfo = await api.get('/users/@me');
@@ -74,11 +68,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         userInfo.data.avatar = `${CDN_IMAGE}/avatars/${userInfo.data.id}/${userInfo.data.avatar}.png`;
 
-        setUser({
+        const userData = {
           ...userInfo.data,
           firstName,
           token: params.access_token,
-        });
+        };
+
+        await AsyncStorage.setItem(COLLECTION_USER, JSON.stringify(userData));
+
+        setUser(userData);
       }
     } catch {
       throw new Error('Não foi possível realizar autenticação');
@@ -87,8 +85,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  async function signOut() {
+    setUser({} as User);
+    await AsyncStorage.removeItem(COLLECTION_USER);
+  }
+
+  async function loadUserStorageData() {
+    const storage = await AsyncStorage.getItem(COLLECTION_USER);
+
+    if (storage) {
+      const userLogged = JSON.parse(storage) as User;
+      api.defaults.headers.authorization = `Bearer ${userLogged.token}`;
+      setUser(userLogged);
+    }
+  }
+
+  useEffect(() => {
+    loadUserStorageData();
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,22 +1,26 @@
 import React from 'react';
-import { Image } from 'react-native';
+import { Image, View } from 'react-native';
 
+import DiscordImg from '../../assets/discord.svg';
 import { styles } from './styles';
 
+const { CDN_IMAGE } = process.env;
+
 type Props = {
-  iconUrl?: string | null;
+  guildId: string;
+  iconId: string | null;
 };
 
-export function GuildIcon({ iconUrl }: Props) {
+export function GuildIcon({ guildId, iconId }: Props) {
+  const uri = `${CDN_IMAGE}/icons/${guildId}/${iconId}.png`;
+
   return (
-    <Image
-      source={{
-        uri:
-          iconUrl ||
-          'https://seeklogo.com/images/D/discord-icon-new-2021-logo-09772BF096-seeklogo.com.png',
-      }}
-      style={styles.image}
-      resizeMode="cover"
-    />
+    <View style={styles.container}>
+      {iconId ? (
+        <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+      ) : (
+        <DiscordImg width={40} height={40} />
+      )}
+    </View>
   );
 }
